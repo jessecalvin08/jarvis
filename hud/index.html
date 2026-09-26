@@ -55,6 +55,7 @@
           <div class="clock-date" id="clock-date">—</div>
         </div>
         <div class="top-actions">
+          <button class="icon-btn" id="btn-kiosk" title="Fullscreen kiosk mode (F)">KIOSK</button>
           <button class="icon-btn" id="btn-log" title="Conversation log (L)">LOG</button>
           <button class="icon-btn" id="btn-reset" title="New conversation">RESET</button>
           <button class="icon-btn" id="btn-settings" title="Settings">⚙</button>
@@ -95,6 +96,11 @@
           <span class="comms-count" id="comms-count">--</span>
           <span class="comms-label">UNREAD<br /><span class="muted" id="comms-sub">INBOX</span></span>
         </button>
+      </section>
+
+      <section class="panel" id="panel-cortex">
+        <header><span>NEURAL ACTIVITY</span><span class="muted" id="cortex-total">0.0% FIRING</span></header>
+        <div class="cortex" id="cortex"></div>
       </section>
 
       <section class="panel grow" id="panel-memory">
@@ -142,7 +148,7 @@
         <input id="input" placeholder="Type a command, or say “Jarvis…”" spellcheck="false" />
         <button type="submit" class="send">EXECUTE</button>
       </form>
-      <div class="hints"><span id="wake-hint">“JARVIS” OR SPACE</span> · ESC STOP · L LOG</div>
+      <div class="hints"><span id="wake-hint">“JARVIS” OR SPACE</span> · ESC STOP · L LOG · F KIOSK</div>
     </footer>
   </div>
 

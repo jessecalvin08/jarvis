@@ -37,6 +37,7 @@ macOS/Linux: `npm install`, `npm run setup`, then `npm start`.
 | **Esc**, or click the core while it talks | Stop talking and cancel the task |
 | Say **"Jarvis, stop"** | Cancels a running task (it doesn't listen while it's speaking, so use Esc then) |
 | **L** | Conversation log |
+| **F** | Fullscreen kiosk mode |
 | Type in the bar and press Enter | Text instead of voice |
 
 Things to try:
@@ -47,6 +48,29 @@ Things to try:
 - "Open Spotify" · "Pause the music" · "Volume up" · "Lock my PC"
 - "What's the weather?" · "Search the web for the latest RTX 5090 price"
 - "Remind me in 20 minutes to leave for the gym" · "Remember that my resume lives in Documents/Career"
+
+## The brain and kiosk mode
+
+The core is a map of Jarvis's mind. Each region lights up, with lightning arcs and a label naming the tool, while the matching work runs. The NEURAL ACTIVITY panel shows how hard each region is firing.
+
+| Region | Lights up when Jarvis is… |
+|---|---|
+| Prefrontal | thinking about your request |
+| Language | listening to you or speaking |
+| Motor cortex | launching apps, running commands, controlling media or power |
+| Association | finding, opening, reading or writing files |
+| Sensory cortex | reading the web or checking the weather |
+| Visual cortex | looking at your screen or putting cards on the HUD |
+| Hippocampus | remembering or forgetting something |
+| Comms relay | reading or sending email |
+| Cerebellum | using an MCP extension |
+
+**Kiosk mode** is for a TV or second monitor. The brain fills the screen, panels float over it, and the typing bar hides so it's voice-only.
+- Press **F** or click **KIOSK** to toggle fullscreen.
+- Open `http://localhost:7777/?kiosk=1` to start in kiosk layout; clicking ENGAGE goes fullscreen.
+- For a dedicated display, launch Chrome with `--kiosk http://localhost:7777/?kiosk=1`.
+
+![Kiosk mode](docs/kiosk.png)
 
 ## What it costs (Claude)
 

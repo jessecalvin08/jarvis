@@ -202,6 +202,31 @@ body[data-state="idle"] .status-led { animation: none; opacity: 0.6; }
 .memory .empty { color: var(--muted); font-style: italic; }
 .memory .empty::before { display: none; }
 
+/* neural activity */
+.cortex { display: flex; flex-direction: column; gap: 5px; }
+.cx-row { --c: var(--cyan); display: grid; grid-template-columns: 8px 1fr 70px 64px; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.08em; color: var(--muted); transition: color 0.3s; }
+.cx-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--c); opacity: 0.55; transition: opacity 0.3s, box-shadow 0.3s; }
+.cx-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cx-bar { height: 4px; background: rgba(56, 214, 255, 0.08); overflow: hidden; }
+.cx-bar i { display: block; height: 100%; width: 0; background: var(--c); opacity: 0.7; transition: width 0.25s linear; }
+.cx-val { text-align: right; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cx-row.active { color: #eafaff; }
+.cx-row.active .cx-dot { opacity: 1; box-shadow: 0 0 10px var(--c); }
+.cx-row.active .cx-bar i { opacity: 1; box-shadow: 0 0 8px var(--c); }
+.cx-row.active .cx-val { color: var(--c); }
+.col-left { overflow-y: auto; scrollbar-width: none; }
+.col-left > .panel { flex-shrink: 0; }
+/* Short screens (laptops): drop the least useful pieces rather than squash everything. */
+@media (max-height: 860px) {
+  #panel-memory { display: none; }
+  .spark { display: none; }
+  .vital { margin-bottom: 9px; }
+  .cortex { gap: 3px; }
+}
+.col-left::-webkit-scrollbar { display: none; }
+#panel-memory { min-height: 120px; }
+.icon-btn.on { color: var(--cyan); border-color: var(--cyan); }
+
 /* ────────────────────────────────────────── center */
 .center { position: relative; min-height: 0; min-width: 0; display: flex; flex-direction: column; }
 .core { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: pointer; }
@@ -439,4 +464,30 @@ kbd { font-family: var(--font-mono); font-size: 10px; border: 1px solid currentC
   .display { position: static; width: 100%; max-height: none; overflow: visible; }
   .hints { display: none; }
   .command { grid-template-columns: auto 1fr; }
+}
+
+/* ────────────────────────────────────────── kiosk: the brain fills the screen, panels float */
+body.kiosk .app { grid-template-columns: 1fr; grid-template-areas: "top" "banner" "center" "cmd"; }
+body.kiosk .col {
+  position: fixed; top: 96px; bottom: 84px; width: 290px; z-index: 5;
+  overflow: hidden; pointer-events: none;
+}
+body.kiosk .col .panel { pointer-events: auto; background: rgba(2, 10, 18, 0.34); backdrop-filter: blur(2px); }
+body.kiosk .col-left { left: 22px; }
+body.kiosk .col-right { right: 22px; }
+body.kiosk #panel-memory,
+body.kiosk #panel-arsenal,
+body.kiosk .col-right .panel.compact { display: none; }
+body.kiosk #panel-ops { flex: 0 1 auto; max-height: 46vh; }
+body.kiosk .display { right: 300px; width: min(360px, 30%); }
+body.kiosk .command-form,
+body.kiosk .hints { display: none; }
+body.kiosk .command { grid-template-columns: auto; justify-content: center; }
+body.kiosk .t-reply { font-size: 26px; }
+body.kiosk .t-user { font-size: 15px; }
+body.kiosk .core-readout { left: 330px; }
+@media (max-width: 1180px) {
+  body.kiosk .col { display: none; }
+  body.kiosk .display { right: 0; }
+  body.kiosk .core-readout { left: 4px; }
 }

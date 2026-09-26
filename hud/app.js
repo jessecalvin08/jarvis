@@ -1,4 +1,4 @@
-import { Core } from "./core.js";
+import { Core, REGIONS } from "./core.js";
 import { Voice } from "./voice.js";
 
 const $ = (id) => document.getElementById(id);
@@ -120,6 +120,7 @@ function handle(ev) {
       $("t-user").textContent = ev.text;
       $("t-reply").textContent = "";
       logLine("user", ev.text);
+      core.pulseRegion("language", 0.9);
       return;
     case "delta":
       reply += ev.text;
@@ -144,6 +145,7 @@ function handle(ev) {
     case "approval_done":
       return closeApproval(ev.id);
     case "panel":
+      core.pulseRegion("visual", 0.8);
       return showCard(ev.panel);
     case "error":
       errorUntil = Date.now() + 2500;
@@ -167,8 +169,10 @@ function handle(ev) {
     case "stats":
       return renderStats(ev.stats);
     case "inbox":
+      core.pulseRegion("comms", 0.6);
       return renderInbox(ev);
     case "memory":
+      if (hello) core.pulseRegion("hippocampus", 1);
       return renderMemory(ev.items);
     case "tools":
       return renderArsenal(ev.tools);
@@ -278,6 +282,7 @@ function opStart(ev) {
   list.prepend(li);
   while (list.children.length > 12) list.lastChild.remove();
   chip(ev.name, "live", true);
+  if (ev.category) core.toolStart(ev.id, ev.name, ev.category);
   updateOpsCount();
 }
 
@@ -292,6 +297,7 @@ function opEnd(ev) {
   li.querySelector(".op-sum").textContent = ev.summary;
   const name = li.querySelector(".op-name").textContent;
   chip(name, "live", false);
+  core.toolEnd(ev.id);
   chip(name, "hit", true);
   setTimeout(() => chip(name, "hit", false), 1200);
   updateOpsCount();
@@ -462,6 +468,8 @@ document.addEventListener("keydown", (e) => {
   if (e.code === "Space") {
     e.preventDefault();
     toggleListen();
+  } else if (e.key === "f" || e.key === "F") {
+    toggleKiosk();
   } else if (e.key === "l" || e.key === "L") {
     $("drawer").hidden = !$("drawer").hidden;
   } else if (e.key === "/") {
@@ -704,8 +712,57 @@ async function engage() {
     : `Good ${part}, ${title}. All systems are online.`;
   showReply(greet);
   voice.say(greet);
+  // ?kiosk=1 lays the HUD out for a TV; the ENGAGE click is the gesture browsers need for fullscreen.
+  if (kioskFromUrl) document.documentElement.requestFullscreen?.().catch(() => undefined);
 }
 $("engage").onclick = engage;
+
+// ───────────────────────────────────────── neural activity panel
+const cortexRows = new Map();
+$("cortex").innerHTML = REGIONS.map(
+  (r) => `<div class="cx-row" data-key="${r.key}" title="${esc(r.role)}">
+      <span class="cx-dot"></span><span class="cx-name">${esc(r.name)}</span>
+      <span class="cx-bar"><i></i></span><span class="cx-val">0.0%</span>
+    </div>`,
+).join("");
+document.querySelectorAll(".cx-row").forEach((row) => cortexRows.set(row.dataset.key, row));
+
+function renderCortex() {
+  for (const s of core.regionStats()) {
+    const row = cortexRows.get(s.key);
+    if (!row) continue;
+    const color = `rgb(${s.color.join(",")})`;
+    row.style.setProperty("--c", color);
+    row.classList.toggle("active", s.glow > 0.45);
+    row.querySelector(".cx-bar i").style.width = `${Math.min(100, s.firing * 2.5 + s.glow * 35)}%`;
+    row.querySelector(".cx-val").textContent = s.tool ? s.tool.toUpperCase() : `${s.firing.toFixed(1)}%`;
+  }
+  $("cortex-total").textContent = `${(core.totalFiring ?? 0).toFixed(1)}% FIRING`;
+}
+setInterval(renderCortex, 250);
+
+// ───────────────────────────────────────── kiosk mode (fullscreen on a TV or second monitor)
+const kioskFromUrl = new URLSearchParams(location.search).has("kiosk");
+
+function setKiosk(on) {
+  document.body.classList.toggle("kiosk", on);
+  core.setKiosk(on);
+  $("btn-kiosk").classList.toggle("on", on);
+}
+
+function toggleKiosk() {
+  const on = !document.body.classList.contains("kiosk");
+  setKiosk(on);
+  if (on) document.documentElement.requestFullscreen?.().catch(() => undefined);
+  else if (document.fullscreenElement) document.exitFullscreen().catch(() => undefined);
+}
+
+document.addEventListener("fullscreenchange", () => {
+  // Leaving fullscreen with the browser's own Esc also leaves kiosk layout, unless the URL asked for it.
+  if (!document.fullscreenElement && !kioskFromUrl) setKiosk(false);
+});
+$("btn-kiosk").onclick = toggleKiosk;
+if (kioskFromUrl) setKiosk(true);
 
 connect();
 setTimeout(() => {
