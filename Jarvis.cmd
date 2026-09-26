@@ -26,6 +26,17 @@ if not exist .env (
     echo Created .env - add your ANTHROPIC_API_KEY to it, save, then close Notepad.
     notepad .env
   )
+) else (
+  rem Using Claude but no key saved yet? Run setup again instead of starting a Jarvis that can't think.
+  findstr /b /c:"LLM_PROVIDER=anthropic" .env >nul
+  if not errorlevel 1 (
+    findstr /b /c:"ANTHROPIC_API_KEY=sk-" .env >nul
+    if errorlevel 1 (
+      echo.
+      echo No Claude API key in .env yet - starting setup. Answer y to replace the old settings.
+      call npm run setup
+    )
+  )
 )
 
 call npm start

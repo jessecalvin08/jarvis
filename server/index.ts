@@ -174,6 +174,16 @@ async function pollInbox(): Promise<void> {
 void pollInbox();
 setInterval(() => void pollInbox(), 3 * 60_000).unref();
 
+// The WebSocket server re-emits the HTTP server's errors, so both need the handler.
+function onListenError(err: NodeJS.ErrnoException): void {
+  if (err.code !== "EADDRINUSE") throw err;
+  console.error(`\n  ${config.assistantName} is already running on port ${config.port} (another window has it open).`);
+  console.error("  If you just updated Jarvis, close that other window first, then start Jarvis again.\n");
+  process.exit(1);
+}
+server.on("error", onListenError);
+wss.on("error", onListenError);
+
 server.listen(config.port, "127.0.0.1", () => {
   const url = `http://localhost:${config.port}`;
   const problem = modelSetupProblem();
