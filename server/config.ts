@@ -42,6 +42,14 @@ if (provider !== "anthropic" && !(provider in OPENAI_COMPATIBLE)) {
 
 const compat = provider === "anthropic" ? null : OPENAI_COMPATIBLE[provider];
 
+/** Used when LLM_MODEL is empty. The free-tier picks can change; the setup wizard checks what's live. */
+const DEFAULT_MODELS: Partial<Record<ProviderName, string>> = {
+  anthropic: "claude-opus-5",
+  gemini: "gemini-2.5-flash",
+  groq: "openai/gpt-oss-120b",
+  ollama: "qwen3:8b",
+};
+
 export const config = {
   port: Number(env("JARVIS_PORT", "7777")),
   openBrowser: envBool("JARVIS_OPEN_BROWSER", true),
@@ -54,7 +62,7 @@ export const config = {
   wakeWord: env("JARVIS_WAKE_WORD", "jarvis").toLowerCase(),
 
   provider,
-  model: env("LLM_MODEL", provider === "anthropic" ? "claude-opus-5" : ""),
+  model: env("LLM_MODEL", DEFAULT_MODELS[provider] ?? ""),
   /** low | medium | high | xhigh | max. Low keeps spoken replies snappy; raise it for harder work. */
   effort: env("LLM_EFFORT", "low") as "low" | "medium" | "high" | "xhigh" | "max",
   anthropicApiKey: env("ANTHROPIC_API_KEY"),

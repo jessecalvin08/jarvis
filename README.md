@@ -15,11 +15,13 @@ A chat model only *talks*. For an assistant to open a file, the app has to give 
 ## Quick start (Windows)
 
 1. Install **Node.js 20+** from https://nodejs.org (LTS).
-2. Get a Claude API key at https://console.anthropic.com and add some credit.
-   A Claude.ai Pro/Max subscription does **not** include API usage. The API is billed separately.
+2. Pick a brain and get its key:
+   - **Free:** a Gemini key from https://aistudio.google.com/apikey (Google account, no card). See [Free options](#free-options).
+   - **Best:** a Claude key from https://console.anthropic.com, with some credit added. A Claude.ai Pro/Max subscription does **not** include API usage; the API is billed separately.
 3. Double-click **`Jarvis.cmd`**. The first run:
    - installs dependencies (about 700 MB, mostly the offline speech engine);
-   - asks for your API key, what to call you, your city and (optionally) Gmail, and checks the key with Anthropic;
+   - asks which brain to use (Claude, Gemini, Groq or Ollama) and checks your key straight away;
+   - asks what to call you, your city and (optionally) Gmail;
    - offers offline voice and downloads its models (about 250 MB).
 4. Jarvis opens at **http://localhost:7777**. Use **Chrome or Edge**, because voice input needs them. Click **ENGAGE** and allow the microphone.
 
@@ -83,6 +85,20 @@ Estimates, not guarantees. The HUD shows a running session estimate bottom-right
 | `claude-haiku-4-5` | $1 / $5 | well under 1¢, fastest |
 
 Prompt caching is on, so follow-up questions reuse the cached instructions at about a tenth of the price. Web search adds $0.01 per search. `LLM_EFFORT=low` (the default) keeps replies quick and cheap. Raise it for hard problems.
+
+## Free options
+
+You don't have to pay to run Jarvis. In `npm run setup`, choose:
+
+| Brain | Cost | What to expect |
+|---|---|---|
+| **Gemini** (option 2) | Free, no card | Good at tools and quick. The free tier is limited to roughly 250 model requests a day, or about 80+ voice commands. Google may use free-tier conversations to improve its products. |
+| **Groq** (option 3) | Free, no card | Extremely fast, but the free daily token allowance runs out after roughly 15 commands, because Jarvis's instructions are long. |
+| **Ollama** (option 4) | Free, fully private | Runs on your PC. It needs a lot of RAM and a good GPU, and small models are unreliable with tools. |
+
+What you give up without Claude: `look_at_screen` (screen vision) and Claude's built-in web search. Free models search the web through DuckDuckGo instead, and the results appear on the HUD. Every other tool works the same.
+
+If Jarvis says it hit the free-tier limit, wait a minute. If it keeps happening, the daily quota is used up until tomorrow.
 
 ## Using a different model
 

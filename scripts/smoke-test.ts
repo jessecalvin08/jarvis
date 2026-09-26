@@ -35,7 +35,7 @@ if (!mode) {
   console.log(voiceOk ? "✓ voice: WAV encoding and transcript cleanup behave" : "✗ voice: WAV encoding or transcript cleanup is wrong");
   if (!voiceOk) failed = true;
 
-  for (const provider of ["anthropic", "openai"]) {
+  for (const provider of ["anthropic", "openai", "gemini"]) {
     const r = spawnSync(process.execPath, ["--import", "tsx", self], { env: { ...process.env, SMOKE_CHILD: provider }, stdio: "inherit" });
     if (r.status !== 0) failed = true;
   }
@@ -89,7 +89,12 @@ function openaiReply(res: http.ServerResponse, step: number): void {
   const events: Array<[null, Json | string]> = [];
   // Exercise the <think> filter the way local reasoning models emit it.
   if (s.text) events.push(chunk({ role: "assistant", content: "<think>internal musing</think>" }), chunk({ content: s.text }));
-  if (s.tool) {
+  if (s.tool && mode === "gemini") {
+    // Gemini style: whole calls in one chunk, parallel calls all claiming index 0.
+    const calls = [{ index: 0, id: `g${step}a`, type: "function", function: { name: s.tool.name, arguments: JSON.stringify(s.tool.input) } }];
+    if (step === 0) calls.push({ index: 0, id: `g${step}b`, type: "function", function: { name: "list_directory", arguments: JSON.stringify({ path: "Documents" }) } });
+    events.push(chunk({ tool_calls: calls }));
+  } else if (s.tool) {
     const json = JSON.stringify(s.tool.input);
     events.push(chunk({ tool_calls: [{ index: 0, id: `call_${step}`, type: "function", function: { name: s.tool.name, arguments: json.slice(0, 5) } }] }));
     events.push(chunk({ tool_calls: [{ index: 0, function: { arguments: json.slice(5) } }] }));
@@ -125,6 +130,7 @@ process.env.LLM_MODEL = mode === "anthropic" ? "claude-opus-5" : "test-model";
 process.env.ANTHROPIC_API_KEY = "test";
 process.env.ANTHROPIC_BASE_URL = `http://127.0.0.1:${port}`;
 process.env.OPENAI_API_KEY = "test";
+process.env.GEMINI_API_KEY = "test";
 process.env.LLM_BASE_URL = `http://127.0.0.1:${port}/v1`;
 
 const { Session } = await import("../server/session.js");
@@ -152,11 +158,13 @@ const check = (ok: unknown, what: string) => {
 const types = events.map((e) => e.type);
 const spoken = events.flatMap((e) => (e.type === "delta" ? [e.text] : [])).join("");
 const toolEnds = events.filter((e): e is Extract<Ev, { type: "tool_end" }> => e.type === "tool_end");
-const panel = events.find((e): e is Extract<Ev, { type: "panel" }> => e.type === "panel");
 
 check(requests.length === 3, `expected 3 model requests, got ${requests.length}`);
 check(toolEnds.some((e) => e.ok && e.summary.includes("smoke marker")), "find_files ran");
-check(panel?.panel.items.some((i) => i.label === "Smoke_Marker_2026.txt"), "search panel lists the file");
+check(
+  events.some((e) => e.type === "panel" && e.panel.items.some((i) => i.label === "Smoke_Marker_2026.txt")),
+  "search panel lists the file",
+);
 check(types.includes("approval"), "write_file asked for approval");
 check(toolEnds.some((e) => !e.ok && e.summary.startsWith("Declined")), "declined write reported");
 check(!fs.existsSync(path.join(home, "Documents", "should-not-exist.txt")), "declined write did not happen");
@@ -167,6 +175,14 @@ check(types.at(-1) === "state" && types.includes("turn_end"), "turn ended cleanl
 const serialized = JSON.stringify(requests);
 check(serialized.includes("Smoke_Marker_2026.txt"), "tool result sent back to the model");
 check(serialized.includes("declined"), "decline sent back to the model");
+if (mode === "gemini") {
+  const tools = JSON.stringify(requests[0].tools);
+  check(!/additionalProperties|"format"|maxLength|minLength|\$schema/.test(tools), "tool schemas trimmed for Gemini");
+  const statusTool = (requests[0].tools as Array<{ function: Json }>).find((t) => t.function.name === "list_directory");
+  check(statusTool?.function.parameters, "tools with inputs keep their parameters");
+  const toolMsgs = (requests[1].messages as Json[]).filter((m) => m.role === "tool");
+  check(toolMsgs.length === 2, `both parallel Gemini calls answered (got ${toolMsgs.length})`);
+}
 if (mode === "anthropic") {
   const first = requests[0];
   check(first.fallbacks === "default", "fallbacks: default set");

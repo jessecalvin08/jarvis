@@ -19,24 +19,12 @@ if not exist node_modules (
   )
 )
 
+rem First run, or no key saved yet: the setup wizard asks the questions. Otherwise it exits silently.
+call npm run setup --silent -- --if-needed
 if not exist .env (
-  call npm run setup
-  if not exist .env (
-    copy .env.example .env >nul
-    echo Created .env - add your ANTHROPIC_API_KEY to it, save, then close Notepad.
-    notepad .env
-  )
-) else (
-  rem Using Claude but no key saved yet? Run setup again instead of starting a Jarvis that can't think.
-  findstr /b /c:"LLM_PROVIDER=anthropic" .env >nul
-  if not errorlevel 1 (
-    findstr /b /c:"ANTHROPIC_API_KEY=sk-" .env >nul
-    if errorlevel 1 (
-      echo.
-      echo No Claude API key in .env yet - starting setup. Answer y to replace the old settings.
-      call npm run setup
-    )
-  )
+  copy .env.example .env >nul
+  echo Created .env - add your API key to it, save, then close Notepad.
+  notepad .env
 )
 
 call npm start
