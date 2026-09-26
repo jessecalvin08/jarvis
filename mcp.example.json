@@ -1,0 +1,33 @@
+{
+  "mcpServers": {
+    "memory-graph": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-memory"
+      ],
+      "autoApprove": true
+    },
+    "example-local-server": {
+      "command": "node",
+      "args": [
+        "C:\\path\\to\\your\\server.js"
+      ],
+      "env": {
+        "SOME_API_KEY": "..."
+      },
+      "autoApprove": [
+        "list_things",
+        "get_thing"
+      ],
+      "disabled": true
+    },
+    "remote-example": {
+      "url": "https://your-mcp-server.example.com/mcp",
+      "headers": {
+        "Authorization": "Bearer YOUR_TOKEN"
+      },
+      "disabled": true
+    }
+  }
+}

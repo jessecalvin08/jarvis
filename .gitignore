@@ -1,0 +1,9 @@
+node_modules/
+.env
+mcp.json
+vault/*
+!vault/.gitkeep
+logs/
+*.log
+.DS_Store
+Thumbs.db

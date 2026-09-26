@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>J.A.R.V.I.S.</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='28' fill='none' stroke='%2322d3ee' stroke-width='4'/%3E%3Ccircle cx='32' cy='32' r='12' fill='%2322d3ee'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body data-state="idle">
+  <div class="backdrop" aria-hidden="true"></div>
+  <div class="scanlines" aria-hidden="true"></div>
+
+  <!-- Boot / engage overlay: browsers need one click before they allow the mic and audio -->
+  <div id="boot" class="boot">
+    <div class="boot-inner">
+      <div class="boot-logo"><span id="boot-name">J.A.R.V.I.S.</span></div>
+      <div class="boot-sub">JUST A RATHER VERY INTELLIGENT SYSTEM</div>
+      <pre id="boot-log" class="boot-log"></pre>
+      <button id="engage" class="engage" hidden>
+        <span class="engage-ring"></span>
+        <span>ENGAGE</span>
+      </button>
+      <div class="boot-hint" id="boot-hint"></div>
+    </div>
+  </div>
+
+  <div class="app">
+    <!-- ───────────────────────── top bar -->
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true"><i></i></div>
+        <div>
+          <div class="brand-name" id="brand-name">J.A.R.V.I.S.</div>
+          <div class="brand-sub"><span class="dot" id="link-dot"></span><span id="link-text">CONNECTING</span> · <span id="model-name">—</span></div>
+        </div>
+      </div>
+
+      <div class="status-pill" id="status-pill">
+        <span class="status-led"></span>
+        <span id="status-text">STANDBY</span>
+        <span class="status-timer" id="status-timer">00:00</span>
+      </div>
+
+      <div class="top-right">
+        <div class="weather" id="weather" hidden>
+          <span class="weather-temp" id="weather-temp">--°</span>
+          <span class="weather-desc"><span id="weather-desc">—</span><br /><span id="weather-place" class="muted">—</span></span>
+        </div>
+        <div class="clock">
+          <div class="clock-time" id="clock-time">00:00:00</div>
+          <div class="clock-date" id="clock-date">—</div>
+        </div>
+        <div class="top-actions">
+          <button class="icon-btn" id="btn-log" title="Conversation log (L)">LOG</button>
+          <button class="icon-btn" id="btn-reset" title="New conversation">RESET</button>
+          <button class="icon-btn" id="btn-settings" title="Settings">⚙</button>
+        </div>
+      </div>
+    </header>
+
+    <div class="banner" id="banner" hidden></div>
+
+    <!-- ───────────────────────── left column -->
+    <aside class="col col-left">
+      <section class="panel" id="panel-vitals">
+        <header><span>SYSTEM VITALS</span><span class="muted" id="host-name">—</span></header>
+        <div class="vital">
+          <div class="vital-row"><span>CPU</span><span id="cpu-val">0%</span></div>
+          <div class="bar" id="cpu-bar"></div>
+          <canvas class="spark" id="cpu-spark" height="34"></canvas>
+        </div>
+        <div class="vital">
+          <div class="vital-row"><span>MEMORY</span><span id="mem-val">—</span></div>
+          <div class="bar" id="mem-bar"></div>
+        </div>
+        <div class="vital">
+          <div class="vital-row"><span id="disk-label">DISK</span><span id="disk-val">—</span></div>
+          <div class="bar" id="disk-bar"></div>
+        </div>
+        <div class="vital-grid">
+          <div><span class="k">NET ↓</span><span class="v" id="net-rx">—</span></div>
+          <div><span class="k">NET ↑</span><span class="v" id="net-tx">—</span></div>
+          <div><span class="k">POWER</span><span class="v" id="battery">AC</span></div>
+          <div><span class="k">UPTIME</span><span class="v" id="uptime">—</span></div>
+        </div>
+      </section>
+
+      <section class="panel" id="panel-comms">
+        <header><span>COMMS</span><span class="muted" id="comms-status">GMAIL</span></header>
+        <button class="comms" id="comms-btn" title="Ask Jarvis to check your inbox">
+          <span class="comms-count" id="comms-count">--</span>
+          <span class="comms-label">UNREAD<br /><span class="muted" id="comms-sub">INBOX</span></span>
+        </button>
+      </section>
+
+      <section class="panel grow" id="panel-memory">
+        <header><span>MEMORY VAULT</span><span class="muted" id="memory-count">0 ENTRIES</span></header>
+        <ul class="memory" id="memory-list"></ul>
+      </section>
+    </aside>
+
+    <!-- ───────────────────────── center: the core -->
+    <main class="center">
+      <canvas id="core" class="core"></canvas>
+      <div class="core-readout" id="core-readout">NODES 0 · LINKS 0 · FIRING 0.0%</div>
+      <div class="core-state" id="core-state">STANDBY</div>
+
+      <div class="display" id="display" aria-live="polite"></div>
+
+      <div class="transcript">
+        <div class="t-user" id="t-user"></div>
+        <div class="t-reply" id="t-reply"></div>
+      </div>
+    </main>
+
+    <!-- ───────────────────────── right column -->
+    <aside class="col col-right">
+      <section class="panel grow" id="panel-ops">
+        <header><span>OPERATIONS</span><span class="muted" id="ops-count">IDLE</span></header>
+        <ol class="ops" id="ops"></ol>
+      </section>
+
+      <section class="panel" id="panel-arsenal">
+        <header><span>ARSENAL</span><span class="muted" id="tool-count">0 TOOLS · WIRED</span></header>
+        <div class="arsenal" id="arsenal"></div>
+      </section>
+
+      <section class="panel compact">
+        <header><span>SESSION</span><span class="muted" id="session-cost">$0.000</span></header>
+      </section>
+    </aside>
+
+    <!-- ───────────────────────── command bar -->
+    <footer class="command">
+      <button class="mic" id="mic" title="Talk (Space)"><span class="mic-core"></span></button>
+      <form id="form" class="command-form" autocomplete="off">
+        <span class="prompt">&gt;</span>
+        <input id="input" placeholder="Type a command, or say “Jarvis…”" spellcheck="false" />
+        <button type="submit" class="send">EXECUTE</button>
+      </form>
+      <div class="hints"><span id="wake-hint">“JARVIS” OR SPACE</span> · ESC STOP · L LOG</div>
+    </footer>
+  </div>
+
+  <!-- Conversation log drawer -->
+  <aside class="drawer" id="drawer" hidden>
+    <header><span>CONVERSATION LOG</span><button class="icon-btn" id="drawer-close">✕</button></header>
+    <div class="log" id="log"></div>
+  </aside>
+
+  <!-- Approval modal for risky actions -->
+  <div class="modal" id="approval" hidden>
+    <div class="modal-card">
+      <div class="modal-title">⚠ AUTHORIZATION REQUIRED</div>
+      <div class="modal-tool" id="approval-tool"></div>
+      <pre class="modal-summary" id="approval-summary"></pre>
+      <details><summary>Details</summary><pre id="approval-detail"></pre></details>
+      <div class="modal-actions">
+        <button class="btn danger" id="approve-no">DENY <kbd>N</kbd></button>
+        <button class="btn primary" id="approve-yes">AUTHORIZE <kbd>Y</kbd></button>
+      </div>
+      <div class="muted small">Or say “yes” / “no”.</div>
+    </div>
+  </div>
+
+  <!-- Settings -->
+  <div class="modal" id="settings" hidden>
+    <div class="modal-card settings">
+      <div class="modal-title">SETTINGS</div>
+      <label class="row"><span>Speak replies</span><input type="checkbox" id="set-speak" /></label>
+      <label class="row"><span>Always listen for wake word</span><input type="checkbox" id="set-wake" /></label>
+      <label class="row"><span>Interface sounds</span><input type="checkbox" id="set-sfx" /></label>
+      <label class="row"><span>Core style</span>
+        <select id="set-theme"><option value="neural">Neural (multicolour)</option><option value="arc">Arc reactor (cyan)</option></select>
+      </label>
+      <label class="row"><span>Browser voice</span><select id="set-voice"></select></label>
+      <div class="muted small" id="tts-note"></div>
+      <div class="modal-actions"><button class="btn primary" id="settings-close">DONE</button></div>
+    </div>
+  </div>
+
+  <div class="toasts" id="toasts"></div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
