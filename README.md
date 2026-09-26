@@ -17,10 +17,14 @@ A chat model only *talks*. For an assistant to open a file, the app has to give 
 1. Install **Node.js 20+** from https://nodejs.org (LTS).
 2. Get a Claude API key at https://console.anthropic.com and add some credit.
    A Claude.ai Pro/Max subscription does **not** include API usage. The API is billed separately.
-3. Double-click **`Jarvis.cmd`**. The first run installs dependencies (about 700 MB, mostly the offline speech engine) and opens `.env` in Notepad. Paste your key into `ANTHROPIC_API_KEY=` and save.
+3. Double-click **`Jarvis.cmd`**. The first run:
+   - installs dependencies (about 700 MB, mostly the offline speech engine);
+   - asks for your API key, what to call you, your city and (optionally) Gmail, and checks the key with Anthropic;
+   - offers offline voice and downloads its models (about 250 MB).
 4. Jarvis opens at **http://localhost:7777**. Use **Chrome or Edge**, because voice input needs them. Click **ENGAGE** and allow the microphone.
 
-macOS/Linux: `npm install`, `cp .env.example .env`, edit it, then `npm start`.
+To change the answers later, run `npm run setup` again or edit `.env`.
+macOS/Linux: `npm install`, `npm run setup`, then `npm start`.
 
 ## Talking to it
 
@@ -89,7 +93,7 @@ Speech recognition uses the browser's Web Speech API. Chrome sends your audio to
 
 ## Offline voice (your audio stays on your PC)
 
-By default, Chrome or Edge does the speech recognition in the cloud. To keep your voice on your machine, set in `.env`:
+Without it, Chrome or Edge does the speech recognition in the cloud. Answer "yes" to offline voice in `npm run setup`, or set this in `.env`:
 
 ```
 STT_PROVIDER=local
@@ -163,6 +167,7 @@ hud/
   app.js              HUD wiring: panels, cards, approvals, vitals
 scripts/smoke-test.ts End-to-end test against a fake model server (no API spend)
 scripts/download-models.ts  npm run models: cache the offline speech models
+scripts/setup.ts      npm run setup: first-run wizard that writes .env
 vault/memory.json     What Jarvis remembers about you (git-ignored)
 ```
 

@@ -10,7 +10,7 @@ if errorlevel 1 (
 )
 
 if not exist node_modules (
-  echo Installing dependencies - first run only...
+  echo Installing dependencies - first run only, this can take a few minutes...
   call npm install
   if errorlevel 1 (
     echo npm install failed.
@@ -20,10 +20,12 @@ if not exist node_modules (
 )
 
 if not exist .env (
-  copy .env.example .env >nul
-  echo.
-  echo Created .env - add your ANTHROPIC_API_KEY to it, save, then close Notepad.
-  notepad .env
+  call npm run setup
+  if not exist .env (
+    copy .env.example .env >nul
+    echo Created .env - add your ANTHROPIC_API_KEY to it, save, then close Notepad.
+    notepad .env
+  )
 )
 
 call npm start

@@ -12,7 +12,8 @@
     "dev": "tsx watch server/index.ts",
     "check": "tsc --noEmit",
     "test": "tsx scripts/smoke-test.ts",
-    "models": "tsx scripts/download-models.ts"
+    "models": "tsx scripts/download-models.ts",
+    "setup": "tsx scripts/setup.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",
