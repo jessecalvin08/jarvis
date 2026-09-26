@@ -204,9 +204,13 @@ function onHello(h) {
   voice.lang = h.speechLang;
   voice.wakeWord = h.wakeWord;
   voice.wakeRe = new RegExp(`\\b(?:hey |hi |ok |okay )?${h.wakeWord}\\b[,.!?]?`, "i");
+  voice.sttProvider = h.stt.provider;
   voice.ttsProvider = h.tts.provider;
-  $("tts-note").textContent =
-    h.tts.provider === "elevenlabs" ? "Speaking with your ElevenLabs voice. The browser voice is only a fallback." : "Tip: add an ElevenLabs key in .env for a film-quality voice.";
+  $("tts-note").textContent = {
+    elevenlabs: "Speaking with your ElevenLabs voice. The browser voice is only a fallback.",
+    kokoro: "Speaking with Kokoro on this computer (offline). The browser voice is only a fallback.",
+    browser: "Tip: set TTS_PROVIDER=kokoro in .env for an offline British voice, or add an ElevenLabs key.",
+  }[h.tts.provider];
   $("comms-status").textContent = h.gmail ? "GMAIL" : "GMAIL · OFFLINE";
   if (!h.gmail) {
     $("comms-count").textContent = "--";
@@ -676,8 +680,12 @@ async function boot(h) {
   await line("TOOLS WIRED", String(h.tools.length));
   await line("MEMORY VAULT", `${h.memory.length} ENTRIES`);
   await line("GMAIL RELAY", h.gmail ? "CONNECTED" : "OFFLINE", h.gmail ? "ok" : "warn");
-  await line("VOICE SYNTHESIS", h.tts.provider === "elevenlabs" ? "ELEVENLABS" : "BROWSER", "ok");
-  await line("SPEECH RECOGNITION", voice.supported ? "READY" : "UNSUPPORTED - USE CHROME/EDGE", voice.supported ? "ok" : "warn");
+  await line("VOICE SYNTHESIS", { elevenlabs: "ELEVENLABS", kokoro: "KOKORO · LOCAL", browser: "BROWSER" }[h.tts.provider], "ok");
+  await line(
+    "SPEECH RECOGNITION",
+    !voice.supported ? "UNSUPPORTED - USE CHROME/EDGE" : h.stt.provider === "local" ? "WHISPER · LOCAL" : "BROWSER",
+    voice.supported ? "ok" : "warn",
+  );
   $("engage").hidden = false;
   $("boot-hint").textContent = "CLICK OR PRESS ANY KEY · ENABLES MICROPHONE AND AUDIO";
 }

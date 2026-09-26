@@ -17,7 +17,7 @@ A chat model only *talks*. For an assistant to open a file, the app has to give 
 1. Install **Node.js 20+** from https://nodejs.org (LTS).
 2. Get a Claude API key at https://console.anthropic.com and add some credit.
    A Claude.ai Pro/Max subscription does **not** include API usage. The API is billed separately.
-3. Double-click **`Jarvis.cmd`**. The first run installs dependencies and opens `.env` in Notepad. Paste your key into `ANTHROPIC_API_KEY=` and save.
+3. Double-click **`Jarvis.cmd`**. The first run installs dependencies (about 700 MB, mostly the offline speech engine) and opens `.env` in Notepad. Paste your key into `ANTHROPIC_API_KEY=` and save.
 4. Jarvis opens at **http://localhost:7777**. Use **Chrome or Edge**, because voice input needs them. Click **ENGAGE** and allow the microphone.
 
 macOS/Linux: `npm install`, `cp .env.example .env`, edit it, then `npm start`.
@@ -87,6 +87,26 @@ Jarvis connects over IMAP/SMTP. It can list and search mail with full Gmail sear
 
 Speech recognition uses the browser's Web Speech API. Chrome sends your audio to Google and Edge sends it to Microsoft. With "Always listen for wake word" on, that happens continuously while the tab is open. Turn it off in ⚙ Settings to use push-to-talk only.
 
+## Offline voice (your audio stays on your PC)
+
+By default, Chrome or Edge does the speech recognition in the cloud. To keep your voice on your machine, set in `.env`:
+
+```
+STT_PROVIDER=local
+TTS_PROVIDER=kokoro
+```
+
+- **Hearing:** Whisper runs on your CPU. Jarvis detects when you start and stop talking, then transcribes that one utterance.
+- **Speaking:** Kokoro's "George" voice (British). Change it with `KOKORO_VOICE`: `bm_fable`, `bm_lewis`, `bm_daniel`, `bf_emma`.
+- **First run downloads about 250 MB of models** into `models/`, and after that it works offline. Run `npm run models` to download them ahead of time.
+- **Already have whisper.cpp from v1?** Start its server (`whisper-server -m ggml-base.en.bin --port 8080`) and set `WHISPER_CPP_URL=http://127.0.0.1:8080`. It's usually faster than the built-in Whisper.
+
+Trade-offs:
+- The **thinking** still happens in the cloud (Claude). Fully offline also means `LLM_PROVIDER=ollama`, which is slow and unreliable with tools on most PCs.
+- With "Always listen for wake word" on, Jarvis transcribes everything it hears. A TV or music playing keeps your CPU busy. Switch to push-to-talk in ⚙ Settings if that bothers you.
+- Speech detection is volume-based. A headset works best, and in a noisy room it may wait for quiet before sending.
+- Kokoro sounds good but less like the films than ElevenLabs.
+
 ## More abilities through MCP (same format as Claude Desktop)
 
 Claude Desktop gets many of its abilities from **MCP servers**. Jarvis loads the same thing: copy `mcp.example.json` to `mcp.json` and add servers exactly as you would in `claude_desktop_config.json`. Their tools appear in the HUD's ARSENAL panel.
@@ -120,6 +140,8 @@ Extras: `"disabled": true` skips a server. `"autoApprove": true` (or a list of t
 | "Couldn't find an app called X" | Say the name as it appears in the Start menu. |
 | Search misses a file | Say a folder: "find budget in D:\Work". Default search covers Desktop, Documents, Downloads, Pictures, Music, Videos, OneDrive and your home folder. |
 | Weather widget missing | Set `JARVIS_LOCATION=Chennai, India` (your city). |
+| "Whisper / Kokoro couldn't load" | The offline models download on first use, so connect to the internet once or run `npm run models`. |
+| Local recognition misses words | Try `LOCAL_STT_MODEL=Xenova/whisper-small.en` (slower, more accurate), or run whisper.cpp and set `WHISPER_CPP_URL`. |
 
 ## How it's built
 
@@ -132,12 +154,15 @@ server/
     anthropic.ts      Claude: streaming, tool use, prompt caching, web search, refusal fallback
     openai.ts         OpenAI-compatible providers (OpenAI, Groq, Gemini, OpenRouter, Ollama)
   tools/              files · system/apps · email · web · memory · hud · mcp
+  voice/local.ts      Offline voice: Whisper (or whisper.cpp) speech-to-text, Kokoro text-to-speech
 hud/
   index.html, styles.css
   core.js             The animated neural core and reactor rings (canvas)
-  voice.js            Wake word, speech recognition, sentence-streamed TTS
+  voice.js            Wake word, speech recognition (browser or local), sentence-streamed TTS
+  capture-worklet.js  Microphone capture for local recognition
   app.js              HUD wiring: panels, cards, approvals, vitals
 scripts/smoke-test.ts End-to-end test against a fake model server (no API spend)
+scripts/download-models.ts  npm run models: cache the offline speech models
 vault/memory.json     What Jarvis remembers about you (git-ignored)
 ```
 

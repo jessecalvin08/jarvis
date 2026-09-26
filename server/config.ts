@@ -29,6 +29,12 @@ const OPENAI_COMPATIBLE: Record<Exclude<ProviderName, "anthropic">, { baseURL: s
   custom: { baseURL: "", keyVar: "LLM_API_KEY" },
 };
 
+function oneOf<T extends string>(name: string, allowed: readonly T[], fallback: T): T {
+  const v = env(name, fallback).toLowerCase() as T;
+  if (!allowed.includes(v)) throw new Error(`${name} must be one of: ${allowed.join(", ")} (got "${v}")`);
+  return v;
+}
+
 const provider = env("LLM_PROVIDER", "anthropic").toLowerCase() as ProviderName;
 if (provider !== "anthropic" && !(provider in OPENAI_COMPATIBLE)) {
   throw new Error(`Unknown LLM_PROVIDER "${provider}". Use one of: anthropic, ${Object.keys(OPENAI_COMPATIBLE).join(", ")}`);
@@ -65,13 +71,27 @@ export const config = {
     appPassword: env("GMAIL_APP_PASSWORD").replace(/\s+/g, ""),
   },
 
+  /** Speech-to-text: the browser's cloud recogniser, or Whisper running on this machine. */
+  stt: {
+    provider: oneOf("STT_PROVIDER", ["browser", "local"], "browser"),
+    model: env("LOCAL_STT_MODEL", "Xenova/whisper-base.en"),
+    /** If set, local STT goes to a running whisper.cpp server instead of the built-in Whisper. */
+    whisperCppUrl: env("WHISPER_CPP_URL").replace(/\/+$/, ""),
+  },
+
   tts: {
-    provider: env("TTS_PROVIDER", env("ELEVENLABS_API_KEY") ? "elevenlabs" : "browser") as "browser" | "elevenlabs",
+    provider: oneOf("TTS_PROVIDER", ["browser", "elevenlabs", "kokoro"], env("ELEVENLABS_API_KEY") ? "elevenlabs" : "browser"),
     elevenLabsKey: env("ELEVENLABS_API_KEY"),
     // "George" - a warm British male premade voice. Swap in any voice ID from your ElevenLabs library.
     elevenLabsVoice: env("ELEVENLABS_VOICE_ID", "JBFqnCBsd6RMkjVDRZzb"),
     elevenLabsModel: env("ELEVENLABS_MODEL", "eleven_flash_v2_5"),
+    // Kokoro runs on this machine. British voices: bm_george, bm_fable, bm_lewis, bm_daniel, bf_emma.
+    kokoroVoice: env("KOKORO_VOICE", "bm_george"),
+    kokoroSpeed: Number(env("KOKORO_SPEED", "1.05")),
   },
+
+  /** Where downloaded speech models are cached, so later runs work offline. */
+  modelsDir: path.resolve(ROOT, env("JARVIS_MODELS_DIR", "models")),
 
   vaultDir: path.resolve(ROOT, env("JARVIS_VAULT_DIR", "vault")),
   mcpConfigPath: path.resolve(ROOT, env("JARVIS_MCP_CONFIG", "mcp.json")),

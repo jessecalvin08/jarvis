@@ -11,7 +11,8 @@
     "start": "tsx server/index.ts",
     "dev": "tsx watch server/index.ts",
     "check": "tsc --noEmit",
-    "test": "tsx scripts/smoke-test.ts"
+    "test": "tsx scripts/smoke-test.ts",
+    "models": "tsx scripts/download-models.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",
@@ -37,5 +38,9 @@
     "@types/nodemailer": "^8.0.2",
     "@types/ws": "^8.18.1",
     "typescript": "^7.0.2"
+  },
+  "optionalDependencies": {
+    "@huggingface/transformers": "^3.8.1",
+    "kokoro-js": "^1.2.1"
   }
 }

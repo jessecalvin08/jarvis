@@ -45,7 +45,8 @@ export type ServerEvent =
       setupProblem: string | null;
       speechLang: string;
       wakeWord: string;
-      tts: { provider: "browser" | "elevenlabs" };
+      stt: { provider: "browser" | "local" };
+      tts: { provider: "browser" | "elevenlabs" | "kokoro" };
       location: string;
       tools: ToolInfo[];
       memory: string[];

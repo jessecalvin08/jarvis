@@ -16,6 +16,25 @@ const mode = process.env.SMOKE_CHILD;
 if (!mode) {
   const self = fileURLToPath(import.meta.url);
   let failed = false;
+
+  // Offline-voice helpers: WAV encoding for whisper.cpp and the Whisper noise filter.
+  const { toWav, cleanTranscript } = await import("../server/voice/local.js");
+  const wav = toWav(new Float32Array([0, 0.5, -0.5, 1, -1.2]));
+  const voiceOk =
+    wav.toString("ascii", 0, 4) === "RIFF" &&
+    wav.toString("ascii", 8, 12) === "WAVE" &&
+    wav.readUInt32LE(24) === 16_000 &&
+    wav.readUInt32LE(40) === 10 &&
+    wav.readInt16LE(44 + 2 * 3) === 32767 &&
+    wav.readInt16LE(44 + 2 * 4) === -32767 &&
+    cleanTranscript(" [BLANK_AUDIO] ") === "" &&
+    cleanTranscript("(music) ♪") === "" &&
+    cleanTranscript(" you") === "" &&
+    cleanTranscript(" Jarvis, open my downloads.") === "Jarvis, open my downloads." &&
+    cleanTranscript("Thank you.") === "Thank you.";
+  console.log(voiceOk ? "✓ voice: WAV encoding and transcript cleanup behave" : "✗ voice: WAV encoding or transcript cleanup is wrong");
+  if (!voiceOk) failed = true;
+
   for (const provider of ["anthropic", "openai"]) {
     const r = spawnSync(process.execPath, ["--import", "tsx", self], { env: { ...process.env, SMOKE_CHILD: provider }, stdio: "inherit" });
     if (r.status !== 0) failed = true;

@@ -16,6 +16,7 @@ import { openTarget } from "./tools/open.js";
 import { systemTools } from "./tools/system.js";
 import type { ToolDef } from "./tools/types.js";
 import { getWeather, webTools } from "./tools/web.js";
+import { synthesize, transcribe, warmUpLocalVoice } from "./voice/local.js";
 
 const builtins: ToolDef[] = [...fileTools, ...systemTools, ...emailTools, ...webTools, ...memoryTools, ...hudTools];
 
@@ -54,9 +55,28 @@ app.get("/api/weather", async (_req, res) => {
   }
 });
 
+function voiceLog(message: string): void {
+  console.log(`  [voice] ${message}`);
+  broadcast({ type: "notice", message });
+}
+
 app.post("/api/tts", async (req, res) => {
   const text = typeof req.body?.text === "string" ? req.body.text.slice(0, 2000) : "";
-  if (!config.tts.elevenLabsKey || !text) {
+  if (!text) {
+    res.status(400).json({ error: "no text" });
+    return;
+  }
+  if (config.tts.provider === "kokoro") {
+    try {
+      const wav = await synthesize(text, voiceLog);
+      res.setHeader("Content-Type", "audio/wav");
+      res.send(wav);
+    } catch (err) {
+      res.status(502).json({ error: `Kokoro: ${(err as Error).message}` });
+    }
+    return;
+  }
+  if (!config.tts.elevenLabsKey) {
     res.status(400).json({ error: "ElevenLabs not configured" });
     return;
   }
@@ -81,6 +101,27 @@ app.post("/api/tts", async (req, res) => {
     Readable.fromWeb(upstream.body as import("node:stream/web").ReadableStream).pipe(res);
   } catch (err) {
     res.status(502).json({ error: (err as Error).message });
+  }
+});
+
+// Local speech recognition: the HUD posts raw 16 kHz mono Float32 samples.
+app.post("/api/stt", express.raw({ type: "application/octet-stream", limit: "4mb" }), async (req, res) => {
+  const body = req.body as Buffer;
+  if (!Buffer.isBuffer(body) || body.length % 4 !== 0) {
+    res.status(400).json({ error: "expected raw float32 PCM" });
+    return;
+  }
+  const seconds = body.length / 4 / 16_000;
+  if (seconds < 0.2 || seconds > 30) {
+    res.status(400).json({ error: `audio must be 0.2–30 s (got ${seconds.toFixed(1)} s)` });
+    return;
+  }
+  // Copy into an aligned buffer; Node's pooled Buffers can start at an odd offset.
+  const pcm = new Float32Array(body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength));
+  try {
+    res.json({ text: await transcribe(pcm, voiceLog) });
+  } catch (err) {
+    res.status(503).json({ error: (err as Error).message });
   }
 });
 
@@ -138,9 +179,11 @@ server.listen(config.port, "127.0.0.1", () => {
   const problem = modelSetupProblem();
   console.log(`\n  ${config.assistantName} online  ·  ${url}`);
   console.log(`  model: ${describeModel()}${problem ? `\n  ! ${problem}` : ""}`);
-  console.log(`  gmail: ${gmailConfigured() ? config.gmail.address : "not configured"}  ·  voice: ${config.tts.provider}\n`);
+  console.log(`  gmail: ${gmailConfigured() ? config.gmail.address : "not configured"}  ·  voice: ${config.stt.provider === "local" ? (config.stt.whisperCppUrl ? "whisper.cpp" : "local whisper") : "browser"} → ${config.tts.provider}\n`);
   if (config.openBrowser) openTarget(url).catch(() => console.log(`  Open ${url} in Chrome or Edge.`));
 });
+
+warmUpLocalVoice(voiceLog);
 
 void loadMcpTools((msg) => {
   console.log(`  [mcp] ${msg}`);

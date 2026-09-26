@@ -33,7 +33,7 @@ export class Voice {
     this.wakeRe = new RegExp(`\\b(?:hey |hi |ok |okay )?${this.wakeWord}\\b[,.!?]?`, "i");
     this.cb = { onCommand, onInterim, onListenChange, onSpeakingChange, onLevel, onSpectrum, onError };
 
-    this.supported = !!SR;
+    this.sttProvider = "browser"; // "browser" (Chrome/Edge cloud recogniser) or "local" (Whisper on this PC)
     this.enabled = false; // recognition should be running
     this.wakeMode = true; // listen continuously for the wake word
     this.activeUntil = 0; // while > now, any speech is a command (no wake word needed)
@@ -50,6 +50,10 @@ export class Voice {
     this.fetches = [];
   }
 
+  get supported() {
+    return this.sttProvider === "local" ? !!navigator.mediaDevices?.getUserMedia : !!SR;
+  }
+
   // ─────────────────────────────── audio setup (needs a user gesture)
 
   async init() {
@@ -63,17 +67,112 @@ export class Voice {
       this.micAnalyser = this.audioCtx.createAnalyser();
       this.micAnalyser.fftSize = 256;
       src.connect(this.micAnalyser);
+      if (this.sttProvider === "local") await this.setupLocalCapture(src);
     } catch (err) {
+      console.error(err);
       this.cb.onError?.("Microphone access was blocked. Allow it in the address bar to talk to me.");
     }
     this.levelLoop();
+  }
+
+  // ─────────────────────────────── local recognition: voice activity detection + Whisper on the server
+
+  async setupLocalCapture(src) {
+    await this.audioCtx.audioWorklet.addModule("capture-worklet.js");
+    const node = new AudioWorkletNode(this.audioCtx, "jarvis-capture");
+    const sink = this.audioCtx.createGain();
+    sink.gain.value = 0; // keeps the node running without playing the mic back
+    src.connect(node);
+    node.connect(sink).connect(this.audioCtx.destination);
+    this.vad = { floor: 0.004, loud: 0, inSpeech: false, chunks: [], preroll: [], silentMs: 0, speechMs: 0 };
+    node.port.onmessage = (e) => this.onFrame(e.data);
+  }
+
+  capturing() {
+    return this.enabled && !this.speaking && (this.wakeMode || this.isActive());
+  }
+
+  onFrame(frame) {
+    const v = this.vad;
+    const frameMs = (frame.length / this.audioCtx.sampleRate) * 1000;
+    if (!this.capturing()) {
+      v.inSpeech = false;
+      v.chunks = [];
+      v.preroll = [];
+      this.hearing = false;
+      return;
+    }
+    let sum = 0;
+    for (let i = 0; i < frame.length; i++) sum += frame[i] * frame[i];
+    const rms = Math.sqrt(sum / frame.length);
+
+    if (!v.inSpeech) {
+      v.preroll.push(frame);
+      if (v.preroll.length * frameMs > 400) v.preroll.shift();
+      v.floor = Math.max(0.002, v.floor * 0.97 + rms * 0.03); // track background noise
+      v.loud = rms > Math.max(v.floor * 3.5, 0.012) ? v.loud + 1 : 0;
+      if (v.loud >= 3) {
+        v.inSpeech = true;
+        v.chunks = [...v.preroll];
+        v.preroll = [];
+        v.silentMs = 0;
+        v.speechMs = 0;
+        this.hearing = true;
+        if (this.isActive()) this.cb.onInterim?.("…");
+      }
+      return;
+    }
+
+    v.chunks.push(frame);
+    v.speechMs += frameMs;
+    v.silentMs = rms < Math.max(v.floor * 2.2, 0.008) ? v.silentMs + frameMs : 0;
+    if (v.silentMs > 750 || v.speechMs > 15000) {
+      v.inSpeech = false;
+      this.hearing = false;
+      const chunks = v.chunks;
+      v.chunks = [];
+      if (v.speechMs - v.silentMs < 300) return; // a click or a cough
+      this.sendUtterance(chunks);
+    }
+  }
+
+  async sendUtterance(chunks) {
+    const total = chunks.reduce((n, c) => n + c.length, 0);
+    const audio = new Float32Array(total);
+    let o = 0;
+    for (const c of chunks) {
+      audio.set(c, o);
+      o += c.length;
+    }
+    // Whisper wants 16 kHz; average blocks of samples down from the device rate.
+    const ratio = this.audioCtx.sampleRate / 16000;
+    const out = new Float32Array(Math.floor(audio.length / ratio));
+    for (let i = 0; i < out.length; i++) {
+      const start = Math.floor(i * ratio);
+      const end = Math.max(start + 1, Math.floor((i + 1) * ratio));
+      let acc = 0;
+      for (let j = start; j < end; j++) acc += audio[j];
+      out[i] = acc / (end - start);
+    }
+    try {
+      const res = await fetch("/api/stt", { method: "POST", headers: { "Content-Type": "application/octet-stream" }, body: out.buffer });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || `speech recognition failed (${res.status})`);
+      if (body.text) this.handleFinalText(body.text);
+      else if (this.isActive()) this.cb.onInterim?.("");
+    } catch (err) {
+      // Offline without a downloaded model, every utterance would fail; say so once, not every time.
+      if (Date.now() - (this.lastSttError ?? 0) > 30000) this.cb.onError?.(`Local speech recognition: ${err.message}`);
+      this.lastSttError = Date.now();
+      if (this.isActive()) this.cb.onInterim?.("");
+    }
   }
 
   levelLoop() {
     const buf = new Uint8Array(128);
     const tick = () => {
       let analyser = null;
-      if (this.speaking && this.ttsProvider === "elevenlabs") analyser = this.ttsAnalyser;
+      if (this.speaking && this.ttsProvider !== "browser") analyser = this.ttsAnalyser;
       else if (this.isActive() || (!this.speaking && this.recognizing && this.hearing)) analyser = this.micAnalyser;
       if (analyser) {
         analyser.getByteFrequencyData(buf);
@@ -133,6 +232,7 @@ export class Voice {
   }
 
   ensureRecognition() {
+    if (this.sttProvider === "local") return; // the capture worklet gates itself with capturing()
     if (!this.supported || !this.enabled || this.recognizing || this.speaking) return;
     if (!this.wakeMode && !this.isActive()) return;
     const rec = new SR();
@@ -196,27 +296,33 @@ export class Voice {
         interim += `${text} `;
         continue;
       }
-      if (!text) continue;
-      const m = text.match(this.wakeRe);
-      if (this.isActive()) {
-        const command = m ? text.slice(m.index + m[0].length).trim() || text : text;
-        this.deactivate();
-        this.cb.onInterim?.("");
-        this.cb.onCommand?.(command, { wake: !!m });
-      } else if (m) {
-        const command = text.slice(m.index + m[0].length).trim();
-        if (command.length > 1) {
-          this.cb.onInterim?.("");
-          this.cb.onCommand?.(command, { wake: true });
-        } else {
-          this.cb.onCommand?.("", { wake: true }); // just "Jarvis" - wait for the request
-          this.activate(9000);
-        }
-      }
+      if (text) this.handleFinalText(text);
     }
     interim = interim.trim();
     if (interim && (this.isActive() || this.wakeRe.test(interim))) {
       this.cb.onInterim?.(interim.replace(this.wakeRe, "").trim() || "…");
+    }
+  }
+
+  /** A finished utterance from either recogniser: route it by wake word / active listening. */
+  handleFinalText(raw) {
+    if (this.speaking) return;
+    const text = raw.trim();
+    const m = text.match(this.wakeRe);
+    if (this.isActive()) {
+      const command = m ? text.slice(m.index + m[0].length).trim() || text : text;
+      this.deactivate();
+      this.cb.onInterim?.("");
+      this.cb.onCommand?.(command.replace(/^[,.!?\s]+/, ""), { wake: !!m });
+    } else if (m) {
+      const command = text.slice(m.index + m[0].length).replace(/^[,.!?\s]+/, "").trim();
+      if (command.length > 1) {
+        this.cb.onInterim?.("");
+        this.cb.onCommand?.(command, { wake: true });
+      } else {
+        this.cb.onCommand?.("", { wake: true }); // just "Jarvis" - wait for the request
+        this.activate(9000);
+      }
     }
   }
 
@@ -253,7 +359,7 @@ export class Voice {
     const text = cleanForSpeech(raw);
     if (!text || !this.speakEnabled) return;
     const item = { text, audio: null };
-    if (this.ttsProvider === "elevenlabs") item.audio = this.fetchAudio(text);
+    if (this.ttsProvider !== "browser") item.audio = this.fetchAudio(text);
     this.queue.push(item);
     if (!this.speaking) this.next();
   }
@@ -285,7 +391,9 @@ export class Voice {
     } catch (err) {
       console.warn("TTS failed, falling back to the browser voice:", err);
       if (item.audio) {
+        this.cb.onError?.(`${this.ttsProvider === "kokoro" ? "Local Kokoro voice" : "ElevenLabs"} unavailable: ${err.message} Using the browser voice for now.`);
         this.ttsProvider = "browser";
+        for (const queued of this.queue) queued.audio = null;
         await this.speakBrowser(item.text).catch(() => undefined);
       }
     }
