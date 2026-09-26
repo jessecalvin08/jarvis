@@ -18,7 +18,10 @@ const rl = readline.createInterface({ input: process.stdin, output: process.stdo
 const lines = rl[Symbol.asyncIterator]();
 
 async function ask(question: string, fallback = ""): Promise<string> {
-  process.stdout.write(question);
+  // In a real terminal readline redraws the line with its own prompt, which would wipe a plain
+  // stdout.write - so the question has to be readline's prompt.
+  rl.setPrompt(question);
+  rl.prompt();
   const { value, done } = await lines.next();
   if (done) {
     process.stdout.write("\n");
